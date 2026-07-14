@@ -17,6 +17,9 @@ function App() {
         <Route path="/" element={<Login />} />
         <Route path="/register" element={<Register />} />
 
+        {/* Privacy Policy */}
+        <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+
         {/* Protected Dashboard Routes */}
         <Route
           path="/dashboard"
@@ -26,12 +29,9 @@ function App() {
             </ProtectedRoute>
           }
         >
-
           <Route index element={<Dashboard />} />
           <Route path="posts" element={<Posts />} />
           <Route path="accounts" element={<Accounts />} />
-          <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-
         </Route>
 
       </Routes>

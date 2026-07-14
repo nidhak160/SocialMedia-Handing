@@ -1,7 +1,16 @@
-import { FiMoon, FiBell, FiUser } from "react-icons/fi";
+import { useNavigate } from "react-router-dom";
+import { FiMoon, FiBell, FiUser, FiLogOut } from "react-icons/fi";
 
 function Navbar() {
+  const navigate = useNavigate();
   const username = localStorage.getItem("username") || "User";
+
+  const handleLogout = () => {
+    localStorage.removeItem("access");
+    localStorage.removeItem("refresh");
+    localStorage.removeItem("username");
+    navigate("/");
+  };
 
   return (
     <div className="h-16 bg-[#0f0f1a] flex items-center justify-between px-6">
@@ -19,15 +28,14 @@ function Navbar() {
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
-            strokeWidth="2"
-          >
+            strokeWidth="2" >
             <circle cx="11" cy="11" r="8" />
             <path d="m21 21-4.35-4.35" />
-          </svg>
+          </svg>  
         </div>
       </div>
 
-      <div className="flex items-center gap-4 ml-6">
+      <div className="flex items-center gap-4 ml-6"> 
         <button className="p-2 text-gray-400 hover:text-white transition-colors">
           <FiMoon size={20} />
         </button>
@@ -45,9 +53,18 @@ function Navbar() {
             <FiUser className="text-white" size={20} />
           </div>
         </div>
+        <button
+          onClick={handleLogout}
+          className="ml-4 p-2 text-gray-400 hover:text-white transition-colors rounded-full border border-gray-700 hover:border-gray-500"
+          title="Logout"
+        >
+          <FiLogOut size={20} />
+        </button>
       </div>
     </div>
   );
 }
 
 export default Navbar;
+
+

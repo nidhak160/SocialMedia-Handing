@@ -2,7 +2,7 @@ import json
 import requests
 from django.conf import settings
 from django.shortcuts import redirect
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
@@ -17,7 +17,9 @@ def get_facebook_login_url():
     """Generate Facebook OAuth login URL"""
     app_id = settings.FACEBOOK_APP_ID
     redirect_uri = settings.FACEBOOK_REDIRECT_URI
-    scope = "pages_show_list,pages_read_engagement,pages_manage_posts,public_profile,email"
+    # For initial Facebook connection, request only valid basic login permissions.
+    # Page publishing permissions require a separate app review process.
+    scope = "public_profile,email"
     
     url = (
         f"https://www.facebook.com/{settings.FACEBOOK_GRAPH_API_VERSION}/dialog/oauth"
@@ -25,6 +27,7 @@ def get_facebook_login_url():
         f"&redirect_uri={redirect_uri}"
         f"&scope={scope}"
         f"&response_type=code"
+        f"&auth_type=reauthenticate"
     )
     return url
 
@@ -102,41 +105,84 @@ def facebook_callback(request):
     """Handle Facebook OAuth callback"""
     code = request.GET.get('code')
     error = request.GET.get('error')
-    
+
+    def render_popup_message(message_type, payload):
+        html_response = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Facebook Login</title>
+            <script>
+                const data = {{
+                    type: '{message_type}',
+                    ...{json.dumps(payload)}
+                }};
+
+                if (window.opener) {{
+                    window.opener.postMessage(data, '*');
+                }}
+
+                window.close();
+            </script>
+        </head>
+        <body>
+            <h1>Facebook Login</h1>
+            <p>{payload.get('message', '')}</p>
+        </body>
+        </html>
+        """
+        return HttpResponse(html_response, content_type='text/html')
+
     if error:
-        return JsonResponse({'error': 'Access denied or cancelled'}, status=400)
+        return render_popup_message('facebookAuthError', {
+            'message': 'Access denied or cancelled',
+            'error': error,
+        })
     
     if not code:
-        return JsonResponse({'error': 'No authorization code provided'}, status=400)
+        return render_popup_message('facebookAuthError', {
+            'message': 'No authorization code provided',
+        })
 
     if not facebook_settings_configured():
-        return JsonResponse(
-            {'error': 'Facebook login is not configured'},
-            status=400
-        )
+        return render_popup_message('facebookAuthError', {
+            'message': 'Facebook login is not configured',
+        })
     
     # Exchange code for access token
     access_token = exchange_code_for_token(code)
     
     if not access_token:
-        return JsonResponse({'error': 'Failed to get access token'}, status=400)
+        return render_popup_message('facebookAuthError', {
+            'message': 'Failed to get access token from Facebook',
+        })
     
     # Get user info
     user_info = get_facebook_user_info(access_token)
     
-    if 'id' not in user_info:
-        return JsonResponse({'error': 'Failed to get user information'}, status=400)
+    facebook_id = user_info.get('id')
+    email = user_info.get('email')
+    name = user_info.get('name', '')
     
+    if not facebook_id:
+        return render_popup_message('facebookAuthError', {
+            'message': 'Failed to get Facebook user information',
+        })
+
     # Get pages
     pages_data = get_facebook_pages(access_token)
     
-    # Get or create user based on Facebook email
-    email = user_info.get('email', '')
-    facebook_id = user_info.get('id', '')
-    name = user_info.get('name', '')
-    
+    # If page access token is available, use the page token and page id
+    page_access_token = None
+    page_id = None
+    page_name = None
+    if pages_data.get('data'):
+        first_page = pages_data['data'][0]
+        page_access_token = first_page.get('access_token')
+        page_id = first_page.get('id')
+        page_name = first_page.get('name')
+
     if not email:
-        # If no email provided, use facebook_id as username
         email = f"facebook_{facebook_id}@facebook.com"
     
     # Try to find user by email
@@ -154,42 +200,50 @@ def facebook_callback(request):
         user.save()
     
     # Store or update social account
+    account_name = page_name or name
+    account_id = page_id or facebook_id
+    access_token_to_store = page_access_token or access_token
+
     social_account, account_created = SocialAccount.objects.get_or_create(
         user=user,
         platform='facebook',
         defaults={
-            'account_name': name,
-            'account_id': facebook_id,
-            'access_token': access_token,
+            'account_name': account_name,
+            'account_id': account_id,
+            'access_token': access_token_to_store,
             'is_connected': True,
         }
     )
     
     if not account_created:
-        social_account.access_token = access_token
+        social_account.access_token = access_token_to_store
+        social_account.account_name = account_name
+        social_account.account_id = account_id
         social_account.is_connected = True
         social_account.save()
     
     # Generate JWT tokens for the user
     refresh = RefreshToken.for_user(user)
     
-    # Return HTML with JavaScript to close popup and store tokens
+    # Return HTML with JavaScript to post tokens back to the opener and close the popup
     html_response = f"""
     <!DOCTYPE html>
     <html>
     <head>
         <title>Facebook Login Success</title>
         <script>
-            // Store tokens in localStorage
-            localStorage.setItem('access', '{str(refresh.access_token)}');
-            localStorage.setItem('refresh', '{str(refresh)}');
-            localStorage.setItem('username', '{user.username}');
-            
-            // Close popup and reload parent window
-            window.close();
+            const data = {{
+                type: 'facebookAuth',
+                access: '{str(refresh.access_token)}',
+                refresh: '{str(refresh)}',
+                username: '{user.username}',
+            }};
+
             if (window.opener) {{
-                window.opener.location.reload();
+                window.opener.postMessage(data, '*');
             }}
+
+            window.close();
         </script>
     </head>
     <body>
@@ -199,7 +253,7 @@ def facebook_callback(request):
     </html>
     """
     
-    return Response(html_response, content_type='text/html')
+    return HttpResponse(html_response, content_type='text/html')
 
 
 @api_view(['POST'])
@@ -228,36 +282,38 @@ def share_post_to_facebook(request, post_id):
     
     # Prepare post content
     message = post.caption
-    
-    # Post to Facebook
-    url = f"https://graph.facebook.com/{settings.FACEBOOK_GRAPH_API_VERSION}/me/feed"
-    
-    data = {
-        'message': message,
-        'access_token': access_token,
-    }
-    
-    # If post has an image, upload it first
+
     if post.image:
-        # Upload image to Facebook
-        photo_url = f"https://graph.facebook.com/{settings.FACEBOOK_GRAPH_API_VERSION}/me/photos"
+        # Upload image directly to the connected Facebook Page
+        photo_url = f"https://graph.facebook.com/{settings.FACEBOOK_GRAPH_API_VERSION}/{social_account.account_id}/photos"
         
         with open(post.image.path, 'rb') as image_file:
             files = {'source': image_file}
             photo_data = {
                 'access_token': access_token,
-                'published': 'false',  # Don't publish yet, just upload
+                'message': message,
+                'published': 'true',
             }
             
             photo_response = requests.post(photo_url, data=photo_data, files=files)
-            photo_result = photo_response.json()
-            
-            if 'id' in photo_result:
-                data['attached_media'] = [{'media_fbid': photo_result['id']}]
-    
-    # Post to feed
-    response = requests.post(url, data=data)
-    result = response.json()
+            result = photo_response.json()
+
+            if 'error' in result:
+                return Response(
+                    {
+                        'error': 'Failed to upload image to Facebook',
+                        'details': result['error'],
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+    else:
+        # Publish a text-only post to the connected Facebook Page
+        url = f"https://graph.facebook.com/{settings.FACEBOOK_GRAPH_API_VERSION}/{social_account.account_id}/feed"
+        response = requests.post(url, data={
+            'message': message,
+            'access_token': access_token,
+        })
+        result = response.json()
     
     if 'id' in result:
         # Update post status to published

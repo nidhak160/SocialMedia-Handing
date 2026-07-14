@@ -167,3 +167,11 @@ FACEBOOK_REDIRECT_URI = os.getenv(
     "http://localhost:8000/api/social-accounts/facebook/callback/",
 )
 FACEBOOK_GRAPH_API_VERSION = os.getenv("FACEBOOK_GRAPH_API_VERSION", "v25.0")
+
+# LinkedIn OAuth Configuration
+LINKEDIN_CLIENT_ID = os.getenv("LINKEDIN_CLIENT_ID", "")
+LINKEDIN_CLIENT_SECRET = os.getenv("LINKEDIN_CLIENT_SECRET", "")
+LINKEDIN_REDIRECT_URI = os.getenv(
+    "LINKEDIN_REDIRECT_URI",
+    "http://localhost:8000/api/social-accounts/linkedin/callback/",
+)

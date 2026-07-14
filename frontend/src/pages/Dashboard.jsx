@@ -7,6 +7,7 @@ import Charts from "../components/Charts";
 import ConnectedAccounts from "../components/ConnectedAccounts";
 import QuickActions from "../components/QuickActions";
 import RecentActivity from "../components/RecentActivity";
+import WorkflowSteps from "../components/WorkflowSteps";
 import { FiFileText, FiCalendar, FiSend, FiUsers } from "react-icons/fi";
 import api from "../services/api";
 
@@ -108,6 +109,7 @@ function Dashboard() {
       <div className="grid min-w-0 grid-cols-3 gap-6">
         <div className="min-w-0 col-span-2 space-y-6">
           <RecentPosts posts={posts} />
+          <WorkflowSteps />
           <ScheduledPosts posts={posts} />
           <Charts posts={posts} />
         </div>

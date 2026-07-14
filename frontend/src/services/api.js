@@ -2,6 +2,10 @@ import axios from "axios";
 
 const api = axios.create({
   baseURL: "http://127.0.0.1:8000/api/",
+  timeout: 10000,
+  headers: {
+    Accept: "application/json",
+  },
 });
 
 api.interceptors.request.use((config) => {
@@ -19,7 +23,10 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    if (error.response?.status !== 401 || originalRequest._retry) {
+    if (
+      error.response?.status !== 401 ||
+      originalRequest._retry
+    ) {
       return Promise.reject(error);
     }
 
@@ -34,18 +41,23 @@ api.interceptors.response.use(
     originalRequest._retry = true;
 
     try {
-      const response = await axios.post("http://127.0.0.1:8000/api/auth/refresh/", {
-        refresh,
-      });
+      const res = await axios.post(
+        "http://127.0.0.1:8000/api/auth/refresh/",
+        {
+          refresh,
+        }
+      );
 
-      localStorage.setItem("access", response.data.access);
-      originalRequest.headers.Authorization = `Bearer ${response.data.access}`;
+      localStorage.setItem("access", res.data.access);
+
+      originalRequest.headers.Authorization =
+        `Bearer ${res.data.access}`;
 
       return api(originalRequest);
-    } catch (refreshError) {
+    } catch (err) {
       localStorage.clear();
       window.location.href = "/";
-      return Promise.reject(refreshError);
+      return Promise.reject(err);
     }
   }
 );

@@ -16,6 +16,7 @@ class Post(models.Model):
 
     caption = models.TextField()
     image = models.ImageField(upload_to="posts/", blank=True, null=True)
+    platforms = models.JSONField(default=list, blank=True)
     scheduled_time = models.DateTimeField(default=timezone.now)
     status = models.CharField(
         max_length=20,

@@ -48,8 +48,28 @@ function Login() {
     const height = 400;
     const left = window.screen.width / 2 - width / 2;
     const top = window.screen.height / 2 - height / 2;
-    
-    // Get Facebook login URL from backend
+
+    const handleMessage = (event) => {
+      if (!event.data) return;
+
+      if (event.data.type === "facebookAuth") {
+        localStorage.setItem("access", event.data.access);
+        localStorage.setItem("refresh", event.data.refresh);
+        localStorage.setItem("username", event.data.username);
+
+        window.removeEventListener("message", handleMessage);
+        alert("Facebook login successful");
+        navigate("/dashboard");
+      }
+
+      if (event.data.type === "facebookAuthError") {
+        window.removeEventListener("message", handleMessage);
+        alert(event.data.message || "Facebook login was cancelled or denied.");
+      }
+    };
+
+    window.addEventListener("message", handleMessage);
+
     api.get("social-accounts/facebook/login/")
       .then(res => {
         const loginUrl = res.data.login_url;
@@ -58,19 +78,18 @@ function Login() {
           "Facebook Login",
           `width=${width},height=${height},left=${left},top=${top}`
         );
-        
-        // Poll for popup close
+
         const pollTimer = setInterval(() => {
           if (popup?.closed) {
             clearInterval(pollTimer);
-            // Check if login was successful by trying to get user info
-            // The backend will handle creating/updating the user
+            window.removeEventListener("message", handleMessage);
           }
         }, 500);
       })
       .catch(err => {
         alert(err.response?.data?.error || "Failed to initiate Facebook login");
         console.log(err);
+        window.removeEventListener("message", handleMessage);
       });
   };
 
@@ -253,9 +272,13 @@ function Login() {
             <div className="mt-6 text-center">
               <p className="text-sm text-white text-opacity-90">
                 Don't have an account?{' '}
-                <a href="#" className="font-semibold text-white hover:text-opacity-80 transition-all underline">
+                <button
+                  type="button"
+                  onClick={() => navigate("/register")}
+                  className="font-semibold text-white hover:text-opacity-80 transition-all underline"
+                >
                   Sign up for free
-                </a>
+                </button>
               </p>
             </div>
 

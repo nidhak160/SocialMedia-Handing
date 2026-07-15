@@ -152,48 +152,56 @@ def get_or_create_facebook_social_account(user, access_token, user_info=None, pa
     return social_account
 
 
-def publish_post_to_facebook(post):
-    social_account = SocialAccount.objects.filter(
-        user=post.user,
-        platform="facebook",
-        is_connected=True,
-    ).first()
+
+def publish_post_to_facebook(post, social_account=None):
+    if not social_account:
+        social_account = SocialAccount.objects.filter(
+            user=post.user,
+            platform="facebook",
+            is_connected=True,
+        ).first()
 
     if not social_account:
         return {"success": False, "error": "No connected Facebook account found."}
 
-    access_token = social_account.page_access_token or social_account.access_token
-    target_id = social_account.page_id or "me"
-    if not access_token:
+    # Facebook deprecated publish_actions permission and /me/feed endpoint
+    # We must use page access tokens to post to Facebook Pages
+    access_token = social_account.page_access_token
+    target_id = social_account.page_id
+    
+    # Posting to user timeline is no longer supported (publish_actions deprecated)
+    # Only allow posting to Facebook Pages
+    if not access_token or not target_id:
         return {
             "success": False,
-            "error": "Facebook access token is missing.",
+            "error": "Facebook Page access token is missing. Please connect a Facebook Page with proper permissions (pages_manage_posts). User timeline posting is no longer supported.",
         }
 
     message = post.caption or post.title or ""
 
     if post.image:
+        # Use the newer /photos endpoint for pages
         url = f"https://graph.facebook.com/{settings.FACEBOOK_GRAPH_API_VERSION}/{target_id}/photos"
         with open(post.image.path, "rb") as image_file:
             files = {"source": image_file}
             payload = {
                 "access_token": access_token,
-                "message": message,
+                "caption": message,
                 "published": "true",
             }
             response = requests.post(url, data=payload, files=files)
     else:
+        # Use the newer /feed endpoint with proper formatting
         url = f"https://graph.facebook.com/{settings.FACEBOOK_GRAPH_API_VERSION}/{target_id}/feed"
-        response = requests.post(
-            url,
-            data={
-                "access_token": access_token,
-                "message": message,
-            },
-        )
+        payload = {
+            "access_token": access_token,
+            "message": message,
+        }
+        response = requests.post(url, data=payload)
 
     try:
         result = response.json()
+
     except ValueError:
         return {
             "success": False,

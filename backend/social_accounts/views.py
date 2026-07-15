@@ -4,12 +4,10 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from .services.facebook_service import (
     facebook_settings_configured as facebook_service_configured,
-    get_facebook_login_url,
-)
+    get_facebook_login_url,)
 from .services.linkedin_service import (
     linkedin_settings_configured as linkedin_service_configured,
-    get_linkedin_login_url,
-)
+    get_linkedin_login_url,)
 from .models import SocialAccount
 from .serializers import SocialAccountSerializer
 

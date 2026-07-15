@@ -14,23 +14,48 @@ class PostListCreateView(generics.ListCreateAPIView):
 
     def perform_create(self, serializer):
         post = serializer.save(user=self.request.user)
+        
+        # Get selected social accounts
+        selected_accounts = post.social_accounts.all()
+        
+        # If no specific accounts selected, fall back to platform-based posting
         platforms = post.platforms or []
         any_success = False
         errors = []
 
-        if "facebook" in platforms:
-            result = publish_post_to_facebook(post)
-            if result.get('success'):
-                any_success = True
-            else:
-                errors.append({"facebook": result})
+        # Post to specifically selected accounts
+        for account in selected_accounts:
+            platform = account.platform
+            
+            if platform == "facebook":
+                result = publish_post_to_facebook(post, account)
+                if result.get('success'):
+                    any_success = True
+                else:
+                    errors.append({"facebook": result})
 
-        if "linkedin" in platforms:
-            result = publish_post_to_linkedin(post)
-            if result.get('success'):
-                any_success = True
-            else:
-                errors.append({"linkedin": result})
+            elif platform == "linkedin":
+                result = publish_post_to_linkedin(post, account)
+                if result.get('success'):
+                    any_success = True
+                else:
+                    errors.append({"linkedin": result})
+
+        # Fallback: if no specific accounts selected, use platform-based posting
+        if not selected_accounts:
+            if "facebook" in platforms:
+                result = publish_post_to_facebook(post)
+                if result.get('success'):
+                    any_success = True
+                else:
+                    errors.append({"facebook": result})
+
+            if "linkedin" in platforms:
+                result = publish_post_to_linkedin(post)
+                if result.get('success'):
+                    any_success = True
+                else:
+                    errors.append({"linkedin": result})
 
         if any_success:
             post.status = "posted"

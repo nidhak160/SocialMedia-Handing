@@ -176,6 +176,16 @@ def facebook_callback(request):
 
 
 def share_post_to_facebook_post(post):
+    # Check if post has specific social accounts selected
+    social_account = post.social_accounts.filter(
+        platform="facebook",
+        is_connected=True
+    ).first()
+    
+    # If specific account is selected, use it; otherwise use default behavior
+    if social_account:
+        return publish_post_to_facebook(post, social_account)
+    
     return publish_post_to_facebook(post)
 
 

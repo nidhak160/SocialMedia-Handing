@@ -48,6 +48,16 @@ def render_popup_message(message_type, payload):
 
 
 def share_post_to_linkedin_post(post):
+    # Check if post has specific social accounts selected
+    social_account = post.social_accounts.filter(
+        platform="linkedin",
+        is_connected=True
+    ).first()
+    
+    # If specific account is selected, use it; otherwise use default behavior
+    if social_account:
+        return publish_post_to_linkedin(post, social_account)
+    
     return publish_post_to_linkedin(post)
 
 

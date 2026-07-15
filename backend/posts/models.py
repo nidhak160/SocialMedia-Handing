@@ -2,6 +2,7 @@ from django.db import models
 from django.conf import settings
 from django.utils import timezone
 
+
 class Post(models.Model):
     STATUS_CHOICES = [
         ("scheduled", "Scheduled"),
@@ -18,6 +19,11 @@ class Post(models.Model):
     caption = models.TextField(blank=True)
     image = models.ImageField(upload_to="posts/", blank=True, null=True)
     platforms = models.JSONField(default=list, blank=True)
+    social_accounts = models.ManyToManyField(
+        "social_accounts.SocialAccount",
+        related_name="posts",
+        blank=True,
+    )
     scheduled_time = models.DateTimeField(default=timezone.now)
     status = models.CharField(
         max_length=20,

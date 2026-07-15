@@ -156,3 +156,12 @@ MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
 
+# Social Accounts Configuration
+FACEBOOK_APP_ID = os.getenv('FACEBOOK_APP_ID', '')
+FACEBOOK_APP_SECRET = os.getenv('FACEBOOK_APP_SECRET', '')
+FACEBOOK_GRAPH_API_VERSION = os.getenv('FACEBOOK_GRAPH_API_VERSION', 'v18.0')
+
+LINKEDIN_CLIENT_ID = os.getenv('LINKEDIN_CLIENT_ID', '')
+LINKEDIN_CLIENT_SECRET = os.getenv('LINKEDIN_CLIENT_SECRET', '')
+
+

@@ -8,6 +8,8 @@ class SocialAccount(models.Model):
         ("instagram", "Instagram"),
         ("linkedin", "LinkedIn"),
         ("twitter", "X (Twitter)"),
+        ("pinterest", "Pinterest"),
+        ("threads", "Threads"),
     ]
 
     user = models.ForeignKey(

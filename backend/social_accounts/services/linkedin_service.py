@@ -115,12 +115,13 @@ def get_or_create_linkedin_social_account(user, access_token, profile, email=Non
     return social_account
 
 
-def publish_post_to_linkedin(post):
-    social_account = SocialAccount.objects.filter(
-        user=post.user,
-        platform="linkedin",
-        is_connected=True,
-    ).first()
+def publish_post_to_linkedin(post, social_account=None):
+    if not social_account:
+        social_account = SocialAccount.objects.filter(
+            user=post.user,
+            platform="linkedin",
+            is_connected=True,
+        ).first()
 
     if not social_account:
         return {"success": False, "error": "No connected LinkedIn account found."}

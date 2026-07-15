@@ -1,78 +1,22 @@
 import json
-import requests
 from django.conf import settings
 from django.http import HttpResponse
+from rest_framework import status
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
-from .models import SocialAccount
 from accounts.models import User
-
-LINKEDIN_OAUTH_URL = "https://www.linkedin.com/oauth/v2/authorization"
-LINKEDIN_TOKEN_URL = "https://www.linkedin.com/oauth/v2/accessToken"
-LINKEDIN_ME_URL = "https://api.linkedin.com/v2/me"
-LINKEDIN_EMAIL_URL = "https://api.linkedin.com/v2/emailAddress?q=members&projection=(elements*(handle~))"
-
-LINKEDIN_SCOPE = ["r_liteprofile", "r_emailaddress"]
-
-
-def linkedin_settings_configured():
-    return bool(settings.LINKEDIN_CLIENT_ID and settings.LINKEDIN_CLIENT_SECRET and settings.LINKEDIN_REDIRECT_URI)
-
-
-def get_linkedin_login_url():
-    state = "linkedin_connect"
-    params = {
-        "response_type": "code",
-        "client_id": settings.LINKEDIN_CLIENT_ID,
-        "redirect_uri": settings.LINKEDIN_REDIRECT_URI,
-        "scope": " ".join(LINKEDIN_SCOPE),
-        "state": state,
-    }
-    return f"{LINKEDIN_OAUTH_URL}?{requests.compat.urlencode(params)}"
-
-
-def exchange_linkedin_code_for_token(code):
-    payload = {
-        "grant_type": "authorization_code",
-        "code": code,
-        "redirect_uri": settings.LINKEDIN_REDIRECT_URI,
-        "client_id": settings.LINKEDIN_CLIENT_ID,
-        "client_secret": settings.LINKEDIN_CLIENT_SECRET,
-    }
-    headers = {
-        "Content-Type": "application/x-www-form-urlencoded",
-    }
-    response = requests.post(LINKEDIN_TOKEN_URL, data=payload, headers=headers)
-    response.raise_for_status()
-    return response.json().get("access_token")
-
-
-def get_linkedin_profile(access_token):
-    headers = {
-        "Authorization": f"Bearer {access_token}",
-    }
-    response = requests.get(LINKEDIN_ME_URL, headers=headers)
-    response.raise_for_status()
-    profile = response.json()
-    first_name = profile.get("localizedFirstName")
-    last_name = profile.get("localizedLastName")
-    return {
-        "id": profile.get("id"),
-        "first_name": first_name,
-        "last_name": last_name,
-        "display_name": f"{first_name} {last_name}".strip(),
-    }
-
-
-def get_linkedin_email(access_token):
-    headers = {
-        "Authorization": f"Bearer {access_token}",
-    }
-    response = requests.get(LINKEDIN_EMAIL_URL, headers=headers)
-    response.raise_for_status()
-    email_data = response.json().get("elements", [])
-    if not email_data:
-        return None
-    return email_data[0].get("handle~", {}).get("emailAddress")
+from posts.models import Post
+from .services.linkedin_service import (
+    linkedin_settings_configured,
+    exchange_linkedin_code_for_token,
+    get_linkedin_profile,
+    get_linkedin_email,
+    get_or_create_linkedin_social_account,
+    publish_post_to_linkedin,
+    parse_state,
+)
 
 
 def render_popup_message(message_type, payload):
@@ -103,6 +47,36 @@ def render_popup_message(message_type, payload):
     return HttpResponse(html_response, content_type='text/html')
 
 
+def share_post_to_linkedin_post(post):
+    return publish_post_to_linkedin(post)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def share_post_to_linkedin(request, post_id):
+    try:
+        post = Post.objects.get(id=post_id, user=request.user)
+    except Post.DoesNotExist:
+        return Response({'error': 'Post not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    result = share_post_to_linkedin_post(post)
+    if result['success']:
+        post.status = 'posted'
+        post.save()
+        return Response({
+            'message': 'Post shared to LinkedIn successfully',
+            'linkedin_post_urn': result.get('provider_post_id'),
+            'post_id': post.id,
+        })
+
+    return Response(
+        {'error': result.get('error', 'Failed to share post to LinkedIn'), 'details': result.get('details')},
+        status=status.HTTP_400_BAD_REQUEST,
+    )
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
 def linkedin_callback(request):
     code = request.GET.get('code')
     error = request.GET.get('error')
@@ -145,37 +119,30 @@ def linkedin_callback(request):
 
     linkedin_id = profile.get('id')
     name = profile.get('display_name') or f"LinkedIn {linkedin_id}"
-    email = email or f"linkedin_{linkedin_id}@linkedin.com"
 
-    user, created = User.objects.get_or_create(
-        email=email,
-        defaults={
-            'username': name.replace(' ', '_').lower(),
-            'is_verified': True,
-        }
-    )
+    state = parse_state(request.GET.get('state'))
+    user = None
+    if state and state.get('user_id'):
+        user = User.objects.filter(pk=state.get('user_id')).first()
 
-    if created:
-        user.set_password(User.objects.make_random_password())
-        user.save()
+    if not user:
+        email = email or f"linkedin_{linkedin_id}@linkedin.com"
+        user, created = User.objects.get_or_create(
+            email=email,
+            defaults={
+                'username': name.replace(' ', '_').lower(),
+                'is_verified': True,
+            }
+        )
+        if created:
+            user.set_password(User.objects.make_random_password())
+            user.save()
 
-    social_account, account_created = SocialAccount.objects.get_or_create(
+    get_or_create_linkedin_social_account(
         user=user,
-        platform='linkedin',
-        defaults={
-            'account_name': name,
-            'account_id': linkedin_id,
-            'access_token': access_token,
-            'is_connected': True,
-        }
+        access_token=access_token,
+        profile=profile,
     )
-
-    if not account_created:
-        social_account.access_token = access_token
-        social_account.account_name = name
-        social_account.account_id = linkedin_id
-        social_account.is_connected = True
-        social_account.save()
 
     refresh = RefreshToken.for_user(user)
     return render_popup_message('linkedinAuth', {

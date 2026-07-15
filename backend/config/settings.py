@@ -156,22 +156,3 @@ MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
 
-# Facebook OAuth Configuration
-FACEBOOK_APP_ID = os.getenv("FACEBOOK_APP_ID", "4003547963273811")
-FACEBOOK_APP_SECRET = os.getenv(
-    "FACEBOOK_APP_SECRET",
-    "91cef358d3c3c11d2938773e7b9f788f",
-)
-FACEBOOK_REDIRECT_URI = os.getenv(
-    "FACEBOOK_REDIRECT_URI",
-    "http://localhost:8000/api/social-accounts/facebook/callback/",
-)
-FACEBOOK_GRAPH_API_VERSION = os.getenv("FACEBOOK_GRAPH_API_VERSION", "v25.0")
-
-# LinkedIn OAuth Configuration
-LINKEDIN_CLIENT_ID = os.getenv("LINKEDIN_CLIENT_ID", "")
-LINKEDIN_CLIENT_SECRET = os.getenv("LINKEDIN_CLIENT_SECRET", "")
-LINKEDIN_REDIRECT_URI = os.getenv(
-    "LINKEDIN_REDIRECT_URI",
-    "http://localhost:8000/api/social-accounts/linkedin/callback/",
-)

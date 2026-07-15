@@ -14,7 +14,8 @@ class Post(models.Model):
         on_delete=models.CASCADE
     )
 
-    caption = models.TextField()
+    title = models.CharField(max_length=255, blank=True, default="")
+    caption = models.TextField(blank=True)
     image = models.ImageField(upload_to="posts/", blank=True, null=True)
     platforms = models.JSONField(default=list, blank=True)
     scheduled_time = models.DateTimeField(default=timezone.now)
@@ -26,4 +27,6 @@ class Post(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
+        if self.title:
+            return self.title
         return self.caption[:30]

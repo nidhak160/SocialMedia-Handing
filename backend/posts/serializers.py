@@ -11,7 +11,7 @@ PLATFORM_CHOICES = [
 ]
 
 class PostSerializer(serializers.ModelSerializer):
-    title = serializers.SerializerMethodField()
+    title = serializers.CharField(required=False, allow_blank=True)
     content = serializers.CharField(source="caption", required=False, allow_blank=True)
     platforms = serializers.JSONField(required=False)
     username = serializers.CharField(source="user.username", read_only=True)
@@ -32,14 +32,11 @@ class PostSerializer(serializers.ModelSerializer):
             "status",
             "created_at",
         ]
-        read_only_fields = ["user", "username", "title", "status", "created_at"]
+        read_only_fields = ["user", "username", "status", "created_at"]
         extra_kwargs = {
             "caption": {"required": False, "allow_blank": True},
             "scheduled_time": {"required": False},
         }
-
-    def get_title(self, obj):
-        return obj.caption[:80]
 
     def validate_platforms(self, value):
         if not isinstance(value, list):
@@ -56,8 +53,9 @@ class PostSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         if self.instance is None:
             caption = attrs.get("caption")
+            title = attrs.get("title")
             image = attrs.get("image")
-            if not caption and not image:
+            if not caption and not title and not image:
                 raise serializers.ValidationError({
                     "content": "Post content or image is required."
                 })

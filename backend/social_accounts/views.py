@@ -2,8 +2,14 @@ from rest_framework import generics, status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
-from .facebook_views import get_facebook_login_url, facebook_settings_configured
-from .linkedin_views import get_linkedin_login_url, linkedin_settings_configured
+from .services.facebook_service import (
+    facebook_settings_configured as facebook_service_configured,
+    get_facebook_login_url,
+)
+from .services.linkedin_service import (
+    linkedin_settings_configured as linkedin_service_configured,
+    get_linkedin_login_url,
+)
 from .models import SocialAccount
 from .serializers import SocialAccountSerializer
 
@@ -21,24 +27,24 @@ class SocialAccountListCreateView(generics.ListCreateAPIView):
 
 
 @api_view(["GET"])
-@permission_classes([AllowAny])
+@permission_classes([IsAuthenticated])
 def social_login(request, platform):
     if platform == "facebook":
-        if not facebook_settings_configured():
+        if not facebook_service_configured():
             return Response(
                 {"error": "Facebook login is not configured."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        login_url = get_facebook_login_url()
+        login_url = get_facebook_login_url(request.user)
         return Response({"login_url": login_url})
 
     if platform == "linkedin":
-        if not linkedin_settings_configured():
+        if not linkedin_service_configured():
             return Response(
                 {"error": "LinkedIn login is not configured."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        login_url = get_linkedin_login_url()
+        login_url = get_linkedin_login_url(request.user)
         return Response({"login_url": login_url})
 
     return Response(
@@ -50,43 +56,19 @@ def social_login(request, platform):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def social_status(request, platform):
-    if platform == "facebook":
-        try:
-            social_account = SocialAccount.objects.get(
-                user=request.user,
-                platform="facebook",
-                is_connected=True,
-            )
-            return Response(
-                {
-                    "is_connected": True,
-                    "account_name": social_account.account_name,
-                    "account_id": social_account.account_id,
-                }
-            )
-        except SocialAccount.DoesNotExist:
-            return Response({"is_connected": False})
+    social_account = SocialAccount.objects.filter(
+        user=request.user,
+        platform=platform,
+        is_connected=True,
+    ).first()
 
-    if platform == "linkedin":
-        try:
-            social_account = SocialAccount.objects.get(
-                user=request.user,
-                platform="linkedin",
-                is_connected=True,
-            )
-            return Response(
-                {
-                    "is_connected": True,
-                    "account_name": social_account.account_name,
-                    "account_id": social_account.account_id,
-                }
-            )
-        except SocialAccount.DoesNotExist:
-            return Response({"is_connected": False})
+    if not social_account:
+        return Response({"is_connected": False})
 
     return Response(
         {
-            "is_connected": False,
-            "message": f"{platform} status not implemented yet.",
+            "is_connected": True,
+            "account_name": social_account.account_name,
+            "account_id": social_account.account_id,
         }
     )

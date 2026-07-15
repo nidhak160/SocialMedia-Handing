@@ -3,15 +3,18 @@ __pycache__/
 *.py[cod]
 
 # Virtual environments
+socialenv/
 socilaenv/
 venv/
 env/
+backend/socilaenv/
 
 # Database
 db.sqlite3
 
 # Uploaded media
 media/
+backend/media/
 
 # Environment variables
 .env

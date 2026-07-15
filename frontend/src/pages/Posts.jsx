@@ -13,7 +13,6 @@ const AVAILABLE_PLATFORMS = [
 function Posts() {
   const [posts, setPosts] = useState([]);
   const [accounts, setAccounts] = useState([]);
-  const [facebookAccountName, setFacebookAccountName] = useState("");
   const [form, setForm] = useState({
     id: null,
     title: "",
@@ -39,10 +38,11 @@ function Posts() {
       const res = await api.get("social-accounts/");
       const accountList = Array.isArray(res.data) ? res.data : [];
       setAccounts(accountList);
-      const fbAccount = accountList.find(
+
+      const facebookAccounts = accountList.filter(
         (acc) => acc.platform === "facebook" && acc.is_connected
       );
-      setFacebookAccountName(fbAccount?.account_name || "");
+      setFacebookConnected(facebookAccounts.length > 0);
     } catch (err) {
       console.log(err);
     }
@@ -77,7 +77,6 @@ function Posts() {
   useEffect(() => {
     fetchPosts();
     fetchAccounts();
-    checkFacebookStatus();
   }, []);
 
   // Handle input
@@ -117,6 +116,7 @@ function Posts() {
     }
 
     const data = new FormData();
+    data.append("title", form.title);
     data.append("content", contentValue);
 
     if (form.image) {
@@ -183,16 +183,6 @@ function Posts() {
     });
   };
 
-  // Check Facebook connection status
-  const checkFacebookStatus = async () => {
-    try {
-      const res = await api.get("social-accounts/facebook/status/");
-      setFacebookConnected(res.data.is_connected);
-    } catch (err) {
-      console.log(err);
-    }
-  };
-
   //  Share post to Facebook via backend
   const handleShareToFacebook = async (post) => {
     if (!post) return;
@@ -207,57 +197,23 @@ function Posts() {
     }
   };
 
-  // Login with Facebook
-  const handleFacebookLogin = () => {
-    const width = 600;
-    const height = 400;
-    const left = window.screen.width / 2 - width / 2;
-    const top = window.screen.height / 2 - height / 2;
+  const handleShareToLinkedIn = async (post) => {
+    if (!post) return;
 
-    const handleMessage = (event) => {
-      if (!event.data) return;
-
-      if (event.data.type === "facebookAuth") {
-        localStorage.setItem("access", event.data.access);
-        localStorage.setItem("refresh", event.data.refresh);
-        localStorage.setItem("username", event.data.username);
-
-        window.removeEventListener("message", handleMessage);
-        alert("Facebook connected successfully");
-        checkFacebookStatus();
-      }
-
-      if (event.data.type === "facebookAuthError") {
-        window.removeEventListener("message", handleMessage);
-        alert(event.data.message || "Facebook login was cancelled or denied.");
-      }
-    };
-
-    window.addEventListener("message", handleMessage);
-
-    api.get("social-accounts/facebook/login/")
-      .then(res => {
-        const loginUrl = res.data.login_url;
-        const popup = window.open(
-          loginUrl,
-          "Facebook Login",
-          `width=${width},height=${height},left=${left},top=${top}`
-        );
-
-        const pollTimer = setInterval(() => {
-          if (popup?.closed) {
-            clearInterval(pollTimer);
-            window.removeEventListener("message", handleMessage);
-            checkFacebookStatus();
-          }
-        }, 500);
-      })
-      .catch(err => {
-        alert(err.response?.data?.error || "Failed to initiate Facebook login");
-        console.log(err);
-        window.removeEventListener("message", handleMessage);
-      });
+    try {
+      const response = await api.post(`social-accounts/linkedin/share/${post.id}/`);
+      alert(response.data.message || "Shared to LinkedIn successfully");
+      fetchPosts();
+    } catch (err) {
+      console.error(err);
+      alert(err.response?.data?.error || "Failed to share to LinkedIn");
+    }
   };
+
+  const linkedinConnected = accounts.some(
+    (acc) => acc.platform === "linkedin" && acc.is_connected
+  );
+
 
   return (
     <div className="min-h-screen bg-gray-100 py-10 px-4">
@@ -269,25 +225,6 @@ function Posts() {
 
       <div className="max-w-2xl mx-auto">
 
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 className="text-lg font-semibold text-gray-700">Facebook Connection</h2>
-            <p className="text-sm text-gray-500">
-              {facebookConnected
-                ? `Connected as ${facebookAccountName || "your Facebook account"}`
-                : "No Facebook account connected."}
-            </p>
-          </div>
-          {!facebookConnected && (
-            <button
-              type="button"
-              onClick={handleFacebookLogin}
-              className="bg-blue-800 hover:bg-blue-900 text-white px-4 py-2 rounded-xl font-semibold"
-            >
-              Connect Facebook
-            </button>
-          )}
-        </div>
 
         {/* Create / Edit Post */}
         <form
@@ -353,17 +290,6 @@ function Posts() {
               {form.id ? "Update Post" : "Create Post"}
             </button>
             
-            {!facebookConnected && (
-              <button
-                type="button"
-                onClick={handleFacebookLogin}
-                className="bg-blue-800 hover:bg-blue-900 text-white px-4 py-2 rounded-xl font-semibold flex items-center gap-2" >
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-                </svg>
-                Connect Facebook
-              </button>
-            )}
           </div>
         </form>
 
@@ -412,6 +338,12 @@ function Posts() {
                     </span>
                   )}
 
+                  {post.platforms?.includes("linkedin") && (
+                    <span className="inline-flex items-center gap-1 rounded-full border border-blue-700 bg-blue-50 px-2 py-1 text-blue-700">
+                      💼 LinkedIn
+                    </span>
+                  )}
+
                   {facebookConnected && post.platforms?.includes("facebook") && (
                     <button
                       type="button"
@@ -419,6 +351,16 @@ function Posts() {
                       className="text-blue-600 font-semibold"
                       title="Share to Facebook" >
                       Share Now
+                    </button>
+                  )}
+
+                  {linkedinConnected && post.platforms?.includes("linkedin") && (
+                    <button
+                      type="button"
+                      onClick={() => handleShareToLinkedIn(post)}
+                      className="text-blue-600 font-semibold"
+                      title="Share to LinkedIn" >
+                      Upload to LinkedIn
                     </button>
                   )}
 

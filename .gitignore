@@ -9,6 +9,9 @@ venv/
 env/
 backend/socilaenv/
 
+venv_clean/
+*.pyc
+
 # Database
 db.sqlite3
 staticfiles/

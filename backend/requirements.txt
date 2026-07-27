@@ -43,6 +43,7 @@ pyOpenSSL==26.3.0
 python-dateutil==2.9.0.post0
 python-dotenv==1.2.2
 pytz==2026.3.post1
+Pillow==10.4.0
 PyYAML==6.0.3
 redis==8.0.1
 requests==2.34.2

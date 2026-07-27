@@ -12,21 +12,24 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 from pathlib import Path
 import os
+import dj_database_url
+from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+load_dotenv(BASE_DIR / '.env')
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-#qw@6332@fwhhe$)3z!d*a1v1@*97^62f&v%gtilqv-u%k*q%8"
+SECRET_KEY = os.getenv('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['127.0.0.1', 'localhost', 'yourapp.onrender.com']
 
 
 # Application definition
@@ -67,6 +70,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    'whitenoise.middleware.WhiteNoiseMiddleware',
 ]
 
 ROOT_URLCONF = "config.urls"
@@ -93,10 +97,9 @@ WSGI_APPLICATION = "config.wsgi.application"
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
 DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
-    }
+    "default": dj_database_url.config(
+        default=os.getenv('DATABASE_URL', f"sqlite:///{BASE_DIR / 'db.sqlite3'}")
+    )
 }
 
 
@@ -135,6 +138,12 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = "static/"
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+STORAGES = {
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
@@ -157,11 +166,15 @@ MEDIA_ROOT = BASE_DIR / "media"
 
 
 # Social Accounts Configuration
-FACEBOOK_APP_ID = os.getenv('FACEBOOK_APP_ID', '')
-FACEBOOK_APP_SECRET = os.getenv('FACEBOOK_APP_SECRET', '')
+FACEBOOK_APP_ID = os.getenv('FACEBOOK_APP_ID', '27450249071307406')
+FACEBOOK_APP_SECRET = os.getenv('FACEBOOK_APP_SECRET', '5cfa4083fa11ac41c6bcd3031f62b928')
 FACEBOOK_GRAPH_API_VERSION = os.getenv('FACEBOOK_GRAPH_API_VERSION', 'v18.0')
+FACEBOOK_LOGIN_CONFIG_ID = "1321424960151809"
+FACEBOOK_REDIRECT_URI = os.getenv(
+    'FACEBOOK_REDIRECT_URI',
+    'http://127.0.0.1:8000/api/social-accounts/facebook/callback/'
+)
 
-LINKEDIN_CLIENT_ID = os.getenv('LINKEDIN_CLIENT_ID', '')
-LINKEDIN_CLIENT_SECRET = os.getenv('LINKEDIN_CLIENT_SECRET', '')
+
 
 

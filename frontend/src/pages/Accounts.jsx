@@ -2,12 +2,12 @@ import { useEffect, useState } from "react";
 import api from "../services/api";
 
 const AVAILABLE_PLATFORMS = [
-  { key: "facebook", label: "Facebook" },
-  { key: "instagram", label: "Instagram" },
-  { key: "linkedin", label: "LinkedIn" },
-  { key: "twitter", label: "X" },
-  { key: "pinterest", label: "Pinterest" },
-  { key: "threads", label: "Threads" },
+  { key: "facebook", label: "Facebook", supported: true },
+  { key: "linkedin", label: "LinkedIn", supported: true },
+  { key: "instagram", label: "Instagram", supported: false },
+  { key: "twitter", label: "X", supported: false },
+  { key: "pinterest", label: "Pinterest", supported: false },
+  { key: "threads", label: "Threads", supported: false },
 ];
 
 function Accounts() {
@@ -88,61 +88,24 @@ function Accounts() {
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <h2 className="text-xl font-semibold">{platform.label}</h2>
-                  <p className="text-sm text-gray-500">Connect your {platform.label} account.</p>
+                  <p className="text-sm text-gray-500">
+                    {platform.supported ? `Connect your ${platform.label} account.` : "Coming soon"}
+                  </p>
                 </div>
                 <button
-                  onClick={() => handleConnect(platform.key)}
-                  className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-4 py-2 text-sm font-semibold"
+                  onClick={() => platform.supported && handleConnect(platform.key)}
+                  disabled={!platform.supported}
+                  className={`rounded-xl px-4 py-2 text-sm font-semibold ${
+                    platform.supported
+                      ? "bg-blue-600 hover:bg-blue-700 text-white"
+                      : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                  }`}
                 >
-                  Connect
+                  {platform.supported ? "Connect" : "Coming Soon"}
                 </button>
-              </div>
-              <div className="space-y-2">
-                <p className="text-sm text-gray-600">Connected accounts:</p>
-                {loading ? (
-                  <p className="text-sm text-gray-500">Loading...</p>
-                ) : (
-                  <div className="space-y-2">
-                    {accounts.filter((account) => account.platform === platform.key).length === 0 ? (
-                      <p className="text-sm text-gray-500">None connected yet.</p>
-                    ) : (
-                      accounts
-                        .filter((account) => account.platform === platform.key)
-                        .map((account) => (
-                          <div key={account.id} className="rounded-xl border border-gray-200 p-3 bg-gray-50">
-                            <p className="text-sm font-medium">{account.account_name}</p>
-                            <p className="text-xs text-gray-500">{account.is_connected ? "Connected" : "Not connected"}</p>
-                          </div>
-                        ))
-                    )}
-                  </div>
-                )}
               </div>
             </div>
           ))}
-        </div>
-
-        <div className="bg-white rounded-2xl shadow-md p-5">
-          <h2 className="text-xl font-semibold mb-4">Connected Accounts</h2>
-          {loading ? (
-            <p className="text-sm text-gray-500">Loading connected accounts…</p>
-          ) : accounts.length === 0 ? (
-            <p className="text-sm text-gray-500">No connected social accounts.</p>
-          ) : (
-            <div className="space-y-3">
-              {accounts.map((account) => (
-                <div key={account.id} className="flex items-center justify-between rounded-xl border border-gray-200 p-4">
-                  <div>
-                    <p className="text-sm font-semibold capitalize">{account.platform}</p>
-                    <p className="text-xs text-gray-500">{account.account_name}</p>
-                  </div>
-                  <span className={`text-xs font-semibold ${account.is_connected ? "text-green-600" : "text-red-600"}`}>
-                    {account.is_connected ? "Connected" : "Disconnected"}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
       </div>
     </div>

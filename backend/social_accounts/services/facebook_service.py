@@ -57,9 +57,9 @@ def get_facebook_login_url(user=None):
     params = {
         "client_id": settings.FACEBOOK_APP_ID,
         "redirect_uri": settings.FACEBOOK_REDIRECT_URI,
-        "scope": ",".join(FACEBOOK_SCOPES),
+        "config_id": settings.FACEBOOK_LOGIN_CONFIG_ID,
         "response_type": "code",
-        "auth_type": "reauthenticate",
+        "auth_type": "rerequest",
     }
     if state_value:
         params["state"] = state_value
@@ -72,9 +72,8 @@ def build_facebook_oauth_url(state=None):
     params = {
         "client_id": settings.FACEBOOK_APP_ID,
         "redirect_uri": settings.FACEBOOK_REDIRECT_URI,
-        "scope": ",".join(FACEBOOK_SCOPES),
+        "config_id": settings.FACEBOOK_LOGIN_CONFIG_ID,
         "response_type": "code",
-        "auth_type": "reauthenticate",
     }
     if state:
         params["state"] = state
@@ -119,37 +118,33 @@ def get_facebook_pages(access_token):
 
 
 def get_or_create_facebook_social_account(user, access_token, user_info=None, pages_data=None):
-    page_access_token = None
-    page_id = None
-    page_name = None
+    created_accounts = []
+    current_page_ids = []
 
     if pages_data and isinstance(pages_data, dict):
         data_list = pages_data.get("data") or []
-        if data_list:
-            first_page = data_list[0]
-            page_access_token = first_page.get("access_token")
-            page_id = first_page.get("id")
-            page_name = first_page.get("name")
+        for page in data_list:
+            current_page_ids.append(page.get("id"))
+            social_account, _ = SocialAccount.objects.update_or_create(
+                user=user,
+                platform="facebook",
+                account_id=page.get("id"),
+                defaults={
+                    "account_name": page.get("name"),
+                    "access_token": access_token,
+                    "page_access_token": page.get("access_token"),
+                    "page_id": page.get("id"),
+                    "page_name": page.get("name"),
+                    "is_connected": True,
+                },
+            )
+            created_accounts.append(social_account)
 
-    account_name = page_name or (user_info or {}).get("name") or "Facebook"
-    account_id = page_id or (user_info or {}).get("id")
+    SocialAccount.objects.filter(
+        user=user, platform="facebook"
+    ).exclude(account_id__in=current_page_ids).update(is_connected=False)
 
-    defaults = {
-        "account_name": account_name,
-        "account_id": account_id,
-        "access_token": access_token,
-        "page_access_token": page_access_token,
-        "page_id": page_id,
-        "page_name": page_name,
-        "is_connected": True,
-    }
-
-    social_account, _ = SocialAccount.objects.update_or_create(
-        user=user,
-        platform="facebook",
-        defaults=defaults,
-    )
-    return social_account
+    return created_accounts
 
 
 
@@ -164,13 +159,9 @@ def publish_post_to_facebook(post, social_account=None):
     if not social_account:
         return {"success": False, "error": "No connected Facebook account found."}
 
-    # Facebook deprecated publish_actions permission and /me/feed endpoint
-    # We must use page access tokens to post to Facebook Pages
     access_token = social_account.page_access_token
     target_id = social_account.page_id
-    
-    # Posting to user timeline is no longer supported (publish_actions deprecated)
-    # Only allow posting to Facebook Pages
+
     if not access_token or not target_id:
         return {
             "success": False,

@@ -19,6 +19,7 @@ function Posts() {
     content: "",
     image: null,
     platforms: [],
+    social_account_ids: [],
     scheduled_time: "",
   });
   const [facebookConnected, setFacebookConnected] = useState(false);
@@ -131,6 +132,10 @@ function Posts() {
       data.append("platforms", JSON.stringify(form.platforms));
     }
 
+    if (form.social_account_ids.length > 0) {
+      data.append("social_account_ids", JSON.stringify(form.social_account_ids));
+    }
+
     try {
       let response;
 
@@ -148,6 +153,7 @@ function Posts() {
         content: "",
         image: null,
         platforms: [],
+        social_account_ids: [],
         scheduled_time: "",
       });
 
@@ -177,6 +183,7 @@ function Posts() {
       content: post.content,
       image: null,
       platforms: post.platforms || [],
+      social_account_ids: post.social_accounts?.map((acc) => acc.id) || [],
       scheduled_time: post.scheduled_time
         ? post.scheduled_time.slice(0, 16)
         : "",

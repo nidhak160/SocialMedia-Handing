@@ -106,7 +106,6 @@ def facebook_callback(request):
         })
 
     facebook_id = user_info.get('id')
-    email = user_info.get('email')
     name = user_info.get('name', '')
 
     if not facebook_id:
@@ -125,18 +124,9 @@ def facebook_callback(request):
         user = User.objects.filter(pk=state.get('user_id')).first()
 
     if not user:
-        if not email:
-            email = f"facebook_{facebook_id}@facebook.com"
-        user, created = User.objects.get_or_create(
-            email=email,
-            defaults={
-                'username': name.replace(' ', '_').lower(),
-                'is_verified': True,
-            },
-        )
-        if created:
-            user.set_password(User.objects.make_random_password())
-            user.save()
+        return render_popup_message('facebookAuthError', {
+            'message': 'Your session could not be verified. Please close this window, log in again, and retry connecting Facebook.',
+        })
 
     social_account = get_or_create_facebook_social_account(
         user=user,
@@ -181,12 +171,25 @@ def share_post_to_facebook_post(post):
         platform="facebook",
         is_connected=True
     ).first()
-    
-    # If specific account is selected, use it; otherwise use default behavior
+
+    # If specific account is selected, use it
     if social_account:
         return publish_post_to_facebook(post, social_account)
-    
-    return publish_post_to_facebook(post)
+
+    # Otherwise, fall back to the user's default connected Facebook account
+    default_account = SocialAccount.objects.filter(
+        user=post.user,
+        platform="facebook",
+        is_connected=True,
+    ).first()
+
+    if not default_account:
+        return {
+            "success": False,
+            "error": "No connected Facebook account found. Please connect a Facebook Page in Settings before publishing.",
+        }
+
+    return publish_post_to_facebook(post, default_account)
 
 
 @api_view(['POST'])

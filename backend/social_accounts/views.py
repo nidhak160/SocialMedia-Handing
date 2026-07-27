@@ -4,10 +4,12 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from .services.facebook_service import (
     facebook_settings_configured as facebook_service_configured,
-    get_facebook_login_url,)
+    get_facebook_login_url,
+)
 from .services.linkedin_service import (
     linkedin_settings_configured as linkedin_service_configured,
-    get_linkedin_login_url,)
+    get_linkedin_login_url,
+)
 from .models import SocialAccount
 from .serializers import SocialAccountSerializer
 
@@ -22,6 +24,16 @@ class SocialAccountListCreateView(generics.ListCreateAPIView):
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
+
+
+class SocialAccountDetailView(generics.RetrieveDestroyAPIView):
+
+    serializer_class = SocialAccountSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return SocialAccount.objects.filter(user=self.request.user)
+
 
 
 @api_view(["GET"])
@@ -58,7 +70,7 @@ def social_status(request, platform):
         user=request.user,
         platform=platform,
         is_connected=True,
-    ).first()
+    ).order_by('-id').first()
 
     if not social_account:
         return Response({"is_connected": False})

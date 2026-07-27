@@ -6,7 +6,6 @@ import Accounts from "./pages/Accounts";
 import DashboardLayout from "./layouts/DashboardLayout";
 import ProtectedRoute from "./routes/ProtectedRoute";
 import Posts from "./pages/Posts";
-import PrivacyPolicy from "./pages/PrivacyPolicy";
 
 function App() {
   return (
@@ -18,7 +17,6 @@ function App() {
         <Route path="/register" element={<Register />} />
 
         {/* Privacy Policy */}
-        <Route path="/privacy-policy" element={<PrivacyPolicy />} />
 
         {/* Protected Dashboard Routes */}
         <Route

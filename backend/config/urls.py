@@ -28,6 +28,7 @@ urlpatterns = [
     path("api/posts/", include("posts.urls")),
     path("api/media/", include("media_manager.urls")),
     path("api/scheduler/", include("scheduler.urls")),
+    path("", include("common.urls")),
 ]
 
 

@@ -11,6 +11,7 @@ backend/socilaenv/
 
 # Database
 db.sqlite3
+staticfiles/
 
 # Uploaded media
 media/
